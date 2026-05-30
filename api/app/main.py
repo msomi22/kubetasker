@@ -215,28 +215,33 @@ def seed_sample_tasks() -> None:
         return
 
     timestamp = now_iso()
-    TASKS.extend(
-        [
-            {
-                "id": "sample-read-config",
-                "title": "Read runtime config",
-                "description": "Use /config/status to inspect non-sensitive runtime configuration.",
-                "priority": "normal",
-                "status": "pending",
-                "createdAt": timestamp,
-                "updatedAt": timestamp,
-            },
-            {
-                "id": "sample-check-readiness",
-                "title": "Check readiness",
-                "description": "Use /ready to verify whether required runtime configuration is valid.",
-                "priority": "high",
-                "status": "pending",
-                "createdAt": timestamp,
-                "updatedAt": timestamp,
-            },
-        ]
-    )
+    sample_tasks = [
+        {
+            "id": "sample-read-config",
+            "title": "Read runtime config",
+            "description": "Use /config/status to inspect non-sensitive runtime configuration.",
+            "priority": "normal",
+            "status": "pending",
+            "createdAt": timestamp,
+            "updatedAt": timestamp,
+        },
+        {
+            "id": "sample-check-readiness",
+            "title": "Check readiness",
+            "description": "Use /ready to verify whether required runtime configuration is valid.",
+            "priority": "high",
+            "status": "pending",
+            "createdAt": timestamp,
+            "updatedAt": timestamp,
+        },
+    ]
+
+    remaining_capacity = max(task_limit() - len(TASKS), 0)
+    if remaining_capacity == 0:
+        logger.info("Skipping sample task seeding because TASK_LIMIT has no remaining capacity.")
+        return
+
+    TASKS.extend(sample_tasks[:remaining_capacity])
 
 
 def validate_startup_configuration() -> None:
