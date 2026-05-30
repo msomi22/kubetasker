@@ -110,6 +110,37 @@ def readiness_state() -> Dict[str, object]:
     return {"ready": ready, "checks": checks}
 
 
+@app.get("/")
+def root():
+    return {
+        "app": "KubeTasker",
+        "message": "Welcome to the KubeTasker CKAD training API.",
+        "docs": "/docs",
+        "health": {
+            "basic": "/health",
+            "liveness": "/livez",
+            "readiness": "/readyz",
+            "startup": "/startupz",
+        },
+        "operations": {
+            "version": "/version",
+            "config": "/config",
+            "secretStatus": "/secret-status",
+            "storageStatus": "/storage/status",
+            "securityStatus": "/security/status",
+            "metrics": "/metrics",
+        },
+        "tasks": {
+            "create": "POST /tasks",
+            "list": "GET /tasks",
+            "stats": "GET /tasks/stats",
+            "getById": "GET /tasks/{task_id}",
+            "updateStatus": "PATCH /tasks/{task_id}/status",
+            "delete": "DELETE /tasks/{task_id}",
+        },
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "app": "KubeTasker"}
