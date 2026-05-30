@@ -39,9 +39,39 @@ jobs:
           from app.main import app
 
           client = TestClient(app)
+
           for path in ['/health', '/livez', '/readyz', '/startupz', '/version', '/config', '/metrics']:
               response = client.get(path)
               assert response.status_code == 200, f'{path} failed with {response.status_code}: {response.text}'
+
+          create_response = client.post('/tasks', json={
+              'title': 'Deploy KubeTasker API',
+              'description': 'Verify the irreducible task lifecycle works',
+              'priority': 'high'
+          })
+          assert create_response.status_code == 201, create_response.text
+          task = create_response.json()
+          task_id = task['id']
+
+          get_response = client.get(f'/tasks/{task_id}')
+          assert get_response.status_code == 200, get_response.text
+          assert get_response.json()['title'] == 'Deploy KubeTasker API'
+
+          list_response = client.get('/tasks?status=pending')
+          assert list_response.status_code == 200, list_response.text
+          assert list_response.json()['count'] == 1
+
+          update_response = client.patch(f'/tasks/{task_id}/status', json={'status': 'completed'})
+          assert update_response.status_code == 200, update_response.text
+          assert update_response.json()['status'] == 'completed'
+
+          stats_response = client.get('/tasks/stats')
+          assert stats_response.status_code == 200, stats_response.text
+          assert stats_response.json()['byStatus']['completed'] == 1
+
+          delete_response = client.delete(f'/tasks/{task_id}')
+          assert delete_response.status_code == 200, delete_response.text
+          assert delete_response.json()['deleted'] is True
           PY
 
       - name: Docker build
