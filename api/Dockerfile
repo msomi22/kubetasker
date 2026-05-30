@@ -3,8 +3,13 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     APP_NAME=KubeTasker \
-    APP_MODE=training \
-    APP_VERSION=0.1.0
+    APP_MODE=learning \
+    TASK_MODE=learning \
+    LOG_LEVEL=info \
+    ENABLE_SAMPLE_TASKS=true \
+    WELCOME_MESSAGE="Welcome to KubeTasker" \
+    CONFIG_FILE_PATH=/etc/kubetasker/app-config.yaml \
+    APP_VERSION=0.2.0
 
 WORKDIR /app
 
