@@ -1,0 +1,134 @@
+name: Release Versioning
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  version-tag-release:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: kubetasker-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract source branch from merge commit
+        id: extract
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+
+          FULL=$(echo "$MSG" | grep -oE 'from ([^ ]+)' | awk '{print $2}' || true)
+
+          if [ -z "$FULL" ]; then
+            BRANCH="unknown"
+          else
+            BRANCH=$(echo "$FULL" | cut -d'/' -f2-)
+          fi
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Detected source branch: $BRANCH"
+
+      - name: Get current version
+        id: version
+        run: |
+          if [ -f VERSION ]; then
+            VERSION=$(tr -d '[:space:]' < VERSION)
+          else
+            VERSION="0.1.0"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          BRANCH="${{ steps.extract.outputs.branch }}"
+          MSG="${{ github.event.head_commit.message }}"
+
+          if [[ "$MSG" == *"[skip release]"* || "$MSG" == chore:*"bump version"* ]]; then
+            TYPE="none"
+          elif [[ "$BRANCH" == feature/* ]]; then
+            TYPE="minor"
+          elif [[ "$BRANCH" == fix/* || "$BRANCH" == bugfix/* || "$BRANCH" == hotfix/* ]]; then
+            TYPE="patch"
+          elif [[ "$BRANCH" == ci/* || "$BRANCH" == chore/* || "$BRANCH" == docs/* || "$BRANCH" == refactor/* || "$BRANCH" == test/* ]]; then
+            TYPE="patch"
+          else
+            TYPE="none"
+          fi
+
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "Bump type: $TYPE"
+
+      - name: Bump version
+        id: new_version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          if [[ "${{ steps.bump.outputs.type }}" == "minor" ]]; then
+            MINOR=$((MINOR+1))
+            PATCH=0
+          elif [[ "${{ steps.bump.outputs.type }}" == "patch" ]]; then
+            PATCH=$((PATCH+1))
+          else
+            echo "new_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "No version bump required."
+            exit 0
+          fi
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "$NEW_VERSION" > VERSION
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Commit version
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add VERSION
+          git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip release]"
+          git pull --rebase origin main
+          git push
+
+      - name: Create tag
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          git tag v${{ steps.new_version.outputs.new_version }} || echo "Tag already exists"
+          git push origin v${{ steps.new_version.outputs.new_version }} || echo "Tag already pushed"
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.type != 'none'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.new_version.outputs.new_version }}
+          name: Release v${{ steps.new_version.outputs.new_version }}
+          generate_release_notes: true
+
+      - name: Docker Hub login
+        if: steps.bump.outputs.type != 'none'
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Docker build versioned image
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ steps.new_version.outputs.new_version }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest ./api
+
+      - name: Docker push versioned images
+        if: steps.bump.outputs.type != 'none'
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:${{ steps.new_version.outputs.new_version }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest
