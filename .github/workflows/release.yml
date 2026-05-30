@@ -55,7 +55,7 @@ jobs:
           BRANCH="${{ steps.extract.outputs.branch }}"
           MSG="${{ github.event.head_commit.message }}"
 
-          if [[ "$MSG" == *"[skip release]"* || "$MSG" == chore:*"bump version"* ]]; then
+          if [[ "$MSG" == *"[skip release]"* ]]; then
             TYPE="none"
           elif [[ "$BRANCH" == feature/* ]]; then
             TYPE="minor"
@@ -70,7 +70,7 @@ jobs:
           echo "type=$TYPE" >> $GITHUB_OUTPUT
           echo "Bump type: $TYPE"
 
-      - name: Bump version
+      - name: Calculate next version
         id: new_version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -83,24 +83,13 @@ jobs:
             PATCH=$((PATCH+1))
           else
             echo "new_version=$VERSION" >> $GITHUB_OUTPUT
-            echo "No version bump required."
+            echo "No release required."
             exit 0
           fi
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "$NEW_VERSION" > VERSION
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
-
-      - name: Commit version
-        if: steps.bump.outputs.type != 'none'
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add VERSION
-          git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip release]"
-          git pull --rebase origin main
-          git push
 
       - name: Create tag
         if: steps.bump.outputs.type != 'none'
