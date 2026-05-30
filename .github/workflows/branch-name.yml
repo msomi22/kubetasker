@@ -1,0 +1,32 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  branch-name:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate branch name
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          PATTERN='^(feature|fix|docs|chore|ci|refactor|test|release|hotfix)/[a-z0-9][a-z0-9._-]*$'
+
+          echo "Checking branch: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^dependabot/ ]]; then
+            echo "Dependabot branch allowed."
+            exit 0
+          fi
+
+          if [[ ! "$BRANCH" =~ $PATTERN ]]; then
+            echo "Invalid branch name: $BRANCH"
+            echo "Allowed pattern: <prefix>/<lowercase-name>"
+            echo "Allowed prefixes: feature, fix, docs, chore, ci, refactor, test, release, hotfix"
+            echo "Example: feature/stage-01-foundation-deployment"
+            exit 1
+          fi
+
+          echo "Branch name is valid."
