@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-tasker-api
+  namespace: kubetasker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-tasker-api
+  template:
+    metadata:
+      labels:
+        app: kube-tasker-api
+    spec:
+      containers:
+        - name: api
+          image: kubetasker-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
